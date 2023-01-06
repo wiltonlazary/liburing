@@ -1,9 +1,5 @@
 /* SPDX-License-Identifier: MIT */
 
-#define _LARGEFILE_SOURCE
-#define _FILE_OFFSET_BITS 64
-
-#include <liburing.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,6 +10,7 @@
 #include <sys/resource.h>
 #include <unistd.h>
 
+#include "liburing.h"
 #include "helpers.h"
 
 static const int RSIZE = 2;

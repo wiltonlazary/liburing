@@ -54,20 +54,14 @@ int io_uring_register_buffers_sparse(struct io_uring *ring, unsigned nr)
 int io_uring_register_buffers(struct io_uring *ring, const struct iovec *iovecs,
 			      unsigned nr_iovecs)
 {
-	int ret;
-
-	ret = __sys_io_uring_register(ring->ring_fd, IORING_REGISTER_BUFFERS,
-				      iovecs, nr_iovecs);
-	return (ret < 0) ? ret : 0;
+	return __sys_io_uring_register(ring->ring_fd, IORING_REGISTER_BUFFERS,
+				       iovecs, nr_iovecs);
 }
 
 int io_uring_unregister_buffers(struct io_uring *ring)
 {
-	int ret;
-
-	ret = __sys_io_uring_register(ring->ring_fd, IORING_UNREGISTER_BUFFERS,
-				      NULL, 0);
-	return (ret < 0) ? ret : 0;
+	return __sys_io_uring_register(ring->ring_fd, IORING_UNREGISTER_BUFFERS,
+				       NULL, 0);
 }
 
 int io_uring_register_files_update_tag(struct io_uring *ring, unsigned off,
@@ -199,49 +193,34 @@ int io_uring_register_files(struct io_uring *ring, const int *files,
 
 int io_uring_unregister_files(struct io_uring *ring)
 {
-	int ret;
-
-	ret = __sys_io_uring_register(ring->ring_fd, IORING_UNREGISTER_FILES,
-				      NULL, 0);
-	return (ret < 0) ? ret : 0;
+	return __sys_io_uring_register(ring->ring_fd, IORING_UNREGISTER_FILES,
+				       NULL, 0);
 }
 
 int io_uring_register_eventfd(struct io_uring *ring, int event_fd)
 {
-	int ret;
-
-	ret = __sys_io_uring_register(ring->ring_fd, IORING_REGISTER_EVENTFD,
-				      &event_fd, 1);
-	return (ret < 0) ? ret : 0;
+	return __sys_io_uring_register(ring->ring_fd, IORING_REGISTER_EVENTFD,
+				       &event_fd, 1);
 }
 
 int io_uring_unregister_eventfd(struct io_uring *ring)
 {
-	int ret;
-
-	ret = __sys_io_uring_register(ring->ring_fd, IORING_UNREGISTER_EVENTFD,
-				      NULL, 0);
-	return (ret < 0) ? ret : 0;
+	return __sys_io_uring_register(ring->ring_fd, IORING_UNREGISTER_EVENTFD,
+				       NULL, 0);
 }
 
 int io_uring_register_eventfd_async(struct io_uring *ring, int event_fd)
 {
-	int ret;
-
-	ret = __sys_io_uring_register(ring->ring_fd,
-				      IORING_REGISTER_EVENTFD_ASYNC, &event_fd,
-				      1);
-	return (ret < 0) ? ret : 0;
+	return __sys_io_uring_register(ring->ring_fd,
+				       IORING_REGISTER_EVENTFD_ASYNC, &event_fd,
+				       1);
 }
 
 int io_uring_register_probe(struct io_uring *ring, struct io_uring_probe *p,
 			    unsigned int nr_ops)
 {
-	int ret;
-
-	ret = __sys_io_uring_register(ring->ring_fd, IORING_REGISTER_PROBE, p,
-				      nr_ops);
-	return (ret < 0) ? ret : 0;
+	return __sys_io_uring_register(ring->ring_fd, IORING_REGISTER_PROBE, p,
+				       nr_ops);
 }
 
 int io_uring_register_personality(struct io_uring *ring)
@@ -260,12 +239,9 @@ int io_uring_register_restrictions(struct io_uring *ring,
 				   struct io_uring_restriction *res,
 				   unsigned int nr_res)
 {
-	int ret;
-
-	ret = __sys_io_uring_register(ring->ring_fd,
-				      IORING_REGISTER_RESTRICTIONS, res,
-				      nr_res);
-	return (ret < 0) ? ret : 0;
+	return __sys_io_uring_register(ring->ring_fd,
+				       IORING_REGISTER_RESTRICTIONS, res,
+				       nr_res);
 }
 
 int io_uring_enable_rings(struct io_uring *ring)

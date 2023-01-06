@@ -11,16 +11,18 @@
 #include <signal.h>
 #include <poll.h>
 #include <sys/wait.h>
+#include <error.h>
 
+#include "helpers.h"
 #include "liburing.h"
 
-static void sig_alrm(int sig)
+static void do_setsockopt(int fd, int level, int optname, int val)
 {
-	fprintf(stderr, "Timed out!\n");
-	exit(1);
+	if (setsockopt(fd, level, optname, &val, sizeof(val)))
+		error(1, errno, "setsockopt %d.%d: %d", level, optname, val);
 }
 
-int main(int argc, char *argv[])
+static int test_basic(void)
 {
 	struct io_uring_cqe *cqe;
 	struct io_uring_sqe *sqe;
@@ -29,33 +31,21 @@ int main(int argc, char *argv[])
 	pid_t p;
 	int ret;
 
-	if (argc > 1)
-		return 0;
-
 	if (pipe(pipe1) != 0) {
 		perror("pipe");
 		return 1;
 	}
 
 	p = fork();
-	switch (p) {
-	case -1:
+	if (p == -1) {
 		perror("fork");
 		exit(2);
-	case 0: {
-		struct sigaction act;
-
+	} else if (p == 0) {
 		ret = io_uring_queue_init(1, &ring, 0);
 		if (ret) {
 			fprintf(stderr, "child: ring setup failed: %d\n", ret);
 			return 1;
 		}
-
-		memset(&act, 0, sizeof(act));
-		act.sa_handler = sig_alrm;
-		act.sa_flags = SA_RESTART;
-		sigaction(SIGALRM, &act, NULL);
-		alarm(1);
 
 		sqe = io_uring_get_sqe(&ring);
 		if (!sqe) {
@@ -92,18 +82,122 @@ int main(int argc, char *argv[])
 							(long) cqe->res);
 			return 1;
 		}
-		exit(0);
-		}
-	default:
-		do {
-			errno = 0;
-			ret = write(pipe1[1], "foo", 3);
-		} while (ret == -1 && errno == EINTR);
 
-		if (ret != 3) {
-			fprintf(stderr, "parent: bad write return %d\n", ret);
+		io_uring_queue_exit(&ring);
+		exit(0);
+	}
+
+	do {
+		errno = 0;
+		ret = write(pipe1[1], "foo", 3);
+	} while (ret == -1 && errno == EINTR);
+
+	if (ret != 3) {
+		fprintf(stderr, "parent: bad write return %d\n", ret);
+		return 1;
+	}
+	close(pipe1[0]);
+	close(pipe1[1]);
+	return 0;
+}
+
+static int test_missing_events(void)
+{
+	struct io_uring_cqe *cqe;
+	struct io_uring_sqe *sqe;
+	struct io_uring ring;
+	int i, ret, sp[2];
+	char buf[2] = {};
+	int res_mask = 0;
+
+	if (!t_probe_defer_taskrun())
+		return 0;
+
+	ret = io_uring_queue_init(8, &ring, IORING_SETUP_SINGLE_ISSUER |
+					    IORING_SETUP_DEFER_TASKRUN);
+	if (ret) {
+		fprintf(stderr, "ring setup failed: %d\n", ret);
+		return 1;
+	}
+
+	if (socketpair(AF_UNIX, SOCK_STREAM, 0, sp) != 0) {
+		perror("Failed to create Unix-domain socket pair\n");
+		return 1;
+	}
+	do_setsockopt(sp[0], SOL_SOCKET, SO_SNDBUF, 1);
+	ret = send(sp[0], buf, sizeof(buf), 0);
+	if (ret != sizeof(buf)) {
+		perror("send failed\n");
+		return 1;
+	}
+
+	sqe = io_uring_get_sqe(&ring);
+	io_uring_prep_poll_multishot(sqe, sp[0], POLLIN|POLLOUT);
+	ret = io_uring_submit(&ring);
+	if (ret != 1) {
+		fprintf(stderr, "sqe submit failed: %d\n", ret);
+		return 1;
+	}
+
+	/* trigger EPOLLIN */
+	ret = send(sp[1], buf, sizeof(buf), 0);
+	if (ret != sizeof(buf)) {
+		fprintf(stderr, "send sp[1] failed %i %i\n", ret, errno);
+		return 1;
+	}
+
+	/* trigger EPOLLOUT */
+	ret = recv(sp[1], buf, sizeof(buf), 0);
+	if (ret != sizeof(buf)) {
+		perror("recv failed\n");
+		return 1;
+	}
+
+	for (i = 0; ; i++) {
+		if (i == 0)
+			ret = io_uring_wait_cqe(&ring, &cqe);
+		else
+			ret = io_uring_peek_cqe(&ring, &cqe);
+
+		if (i != 0 && ret == -EAGAIN) {
+			break;
+		}
+		if (ret) {
+			fprintf(stderr, "wait completion %d, %i\n", ret, i);
 			return 1;
 		}
-		return 0;
+		res_mask |= cqe->res;
+		io_uring_cqe_seen(&ring, cqe);
 	}
+
+	if ((res_mask & (POLLIN|POLLOUT)) != (POLLIN|POLLOUT)) {
+		fprintf(stderr, "missing poll events %i\n", res_mask);
+		return 1;
+	}
+	io_uring_queue_exit(&ring);
+	close(sp[0]);
+	close(sp[1]);
+	return 0;
+}
+
+int main(int argc, char *argv[])
+{
+	int ret;
+
+	if (argc > 1)
+		return 0;
+
+	ret = test_basic();
+	if (ret) {
+		fprintf(stderr, "test_basic() failed %i\n", ret);
+		return T_EXIT_FAIL;
+	}
+
+	ret = test_missing_events();
+	if (ret) {
+		fprintf(stderr, "test_missing_events() failed %i\n", ret);
+		return T_EXIT_FAIL;
+	}
+
+	return 0;
 }

@@ -54,7 +54,7 @@ static int inject_fault(int nth)
   return fd;
 }
 
-static int setup_fault()
+static int setup_fault(void)
 {
   static struct {
     const char* file;
@@ -79,7 +79,7 @@ static int setup_fault()
   return 0;
 }
 
-uint64_t r[2] = {0xffffffffffffffff, 0xffffffffffffffff};
+static uint64_t r[2] = {0xffffffffffffffff, 0xffffffffffffffff};
 
 int main(int argc, char *argv[])
 {

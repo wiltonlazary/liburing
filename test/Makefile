@@ -13,7 +13,8 @@ override CPPFLAGS += \
 	-D_GNU_SOURCE \
 	-D__SANE_USERSPACE_TYPES__ \
 	-I../src/include/ \
-	-include ../config-host.h
+	-include ../config-host.h \
+	-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 
 CFLAGS ?= -g -O3 -Wall -Wextra
 XCFLAGS = -Wno-unused-parameter -Wno-sign-compare
@@ -67,10 +68,12 @@ test_srcs := \
 	drop-submit.c \
 	eeed8b54e0df.c \
 	empty-eownerdead.c \
+	eploop.c \
 	eventfd.c \
 	eventfd-disable.c \
 	eventfd-reg.c \
 	eventfd-ring.c \
+	evloop.c \
 	exec-target.c \
 	exit-no-cleanup.c \
 	fadvise.c \
@@ -122,8 +125,8 @@ test_srcs := \
 	poll-cancel-ton.c \
 	poll-link.c \
 	poll-many.c \
-	poll-mshot-update.c \
 	poll-mshot-overflow.c \
+	poll-mshot-update.c \
 	poll-ring.c \
 	poll-v-poll.c \
 	pollfree.c \
@@ -144,10 +147,12 @@ test_srcs := \
 	sendmsg_fs_cve.c \
 	send_recv.c \
 	send_recvmsg.c \
+	send-zerocopy.c \
 	shared-wq.c \
 	short-read.c \
 	shutdown.c \
 	sigfd-deadlock.c \
+	single-issuer.c \
 	skip-cqe.c \
 	socket.c \
 	socket-rw.c \
@@ -168,8 +173,8 @@ test_srcs := \
 	submit-and-wait.c \
 	submit-link-fail.c \
 	submit-reuse.c \
-	sync-cancel.c \
 	symlink.c \
+	sync-cancel.c \
 	teardowns.c \
 	thread-exit.c \
 	timeout.c \
@@ -177,11 +182,9 @@ test_srcs := \
 	timeout-overflow.c \
 	tty-write-dpoll.c \
 	unlink.c \
+	version.c \
 	wakeup-hang.c \
 	xattr.c \
-	skip-cqe.c \
-	single-issuer.c \
-	send-zerocopy.c \
 	# EOL
 
 all_targets :=
@@ -215,8 +218,17 @@ helpers.o: helpers.c
 %.t: %.c $(helpers) helpers.h ../src/liburing.a
 	$(QUIET_CC)$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $< $(helpers) $(LDFLAGS)
 
+#
+# Clang++ is not happy with -Wmissing-prototypes:
+#
+#   cc1plus: warning: command-line option '-Wmissing-prototypes' \
+#   is valid for C/ObjC but not for C++
+#
 %.t: %.cc $(helpers) helpers.h ../src/liburing.a
-	$(QUIET_CXX)$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $< $(helpers) $(LDFLAGS)
+	$(QUIET_CXX)$(CXX) \
+	$(patsubst -Wmissing-prototypes,,$(CPPFLAGS)) \
+	$(patsubst -Wmissing-prototypes,,$(CXXFLAGS)) \
+	-o $@ $< $(helpers) $(LDFLAGS)
 
 
 install: $(test_targets) runtests.sh runtests-loop.sh
